@@ -19,7 +19,6 @@ while cap.isOpened():
         break
 
     #frame = cv.convertScaleAbs(frame, alpha=1.1, beta=50)
-
     frame_to_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
     hand_results = hands.process(frame_to_rgb)
 
@@ -47,11 +46,6 @@ while cap.isOpened():
                 cx, cy = int(landmark.x * w), int(landmark.y * h)
                 cv.circle(frame, (cx, cy), 5, (0, 255, 0), 1)
                 
-                if _id > 0:
-                    prev_landmark = landmarks.landmark[_id - 1]
-                    lx, ly = int(prev_landmark.x * w), int(prev_landmark.y * h)
-                    cv.line(frame, (lx, ly), (cx, cy), (255, 0, 0), 2)
-
     cv.imshow('TecVision', frame)
 
     if cv.waitKey(1) & 0xFF == ord('q'):
