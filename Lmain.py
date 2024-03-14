@@ -5,8 +5,8 @@ import cv2 as cv
 import mediapipe as mp
 import math
 import pytesseract
-from time import sleep
-import os
+from time import time
+import os   
 os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
 
 # DIRETÓRIO DO EXECUTÁVEL #
@@ -22,15 +22,22 @@ hands = mp_hands.Hands()
 cap = cv.VideoCapture(0)
 
 #cap = cvLIBRARY.VideoCapture("/dev/video0", cvLIBRARY.CAP_V4L2)
-cap.set(cv.CAP_PROP_FRAME_WIDTH, 300)
-cap.set(cv.CAP_PROP_FRAME_HEIGHT, 200)
-cap.set(cv.CAP_PROP_FPS, 8)
+# cap.set(cv.CAP_PROP_FRAME_WIDTH, 300)
+# cap.set(cv.CAP_PROP_FRAME_HEIGHT, 200)
+# cap.set(cv.CAP_PROP_FPS, 8)
 
 # VARIÁVEIS DE CONTROLE #
 modo_leitura = False
 controle_leitura = False
 
 print(pytesseract.get_languages())
+
+tempo = 0
+
+# FUNCTIONS #
+def teste():
+    print(tempo)
+    print(f"Tempo de execução do programa: {(time() - tempo)}")
 
 while cap.isOpened():
     status, frame = cap.read()
@@ -57,34 +64,37 @@ while cap.isOpened():
 
                 # Distância euclidiana -> d = √ ( X2 - X1 )^2 + ( Y2 - Y1 )^2
                 distancia = math.sqrt( ( polegar_x - mindinho_x ) ** 2 + ( polegar_y - mindinho_y) ** 2 ) 
-                max_distance = 15
+                max_distance = 20
 
                 if distancia < max_distance and not controle_leitura:
                     controle_leitura = True
                     modo_leitura = not modo_leitura
 
                     if modo_leitura:
-                       cap_frame = cv.imwrite('cap_frame.png', frame)
-                       #os.system('espeak -v pt-br ' + 'Imagem captada, aguarde a leitura')
-                       try:
-                            text_to_frame = pytesseract.image_to_string(cap_frame, lang='por')
-                            print(text_to_frame)
-                            #os.system('espeak -v pt-br ' + text_to_frame)
-                       except Exception as error:
-                            print(f"Ocorreu um erro > {error}")
-                            pass
-                    else:
-                        pass
+                        tempo = time()
+                        print(tempo)
+                        print("Captando imagem aguarde e evite movimentar-se")
 
                 elif distancia > max_distance and controle_leitura:
                     controle_leitura = False
-
+                
                 cx, cy = int(landmark.x * w), int(landmark.y * h)
                 cv.circle(frame, (cx, cy), 5, (0, 255, 0), 1)
-                
+
+    if modo_leitura and ( time() - tempo ) >= 10:
+        cv.imwrite('cap_frame.png', frame)
+        modo_leitura = False
+        text = pytesseract.image_to_string('cap_frame.png', lang='por')
+        if len(text):
+            print(text)
+        else:
+            print('Não foi detectado nenhum texto')
+
     cv.imshow('TecVision', frame)
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
+
+teste()
 
 cap.release()
 cv.destroyAllWindows()
