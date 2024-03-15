@@ -1,33 +1,34 @@
-# https://digi.bib.uni-mannheim.de/tesseract/
-
 # BIBLIOTECAS #
 import cv2 as cv
 import mediapipe as mp
 import math
 import pytesseract
+from time import time
 import os
-os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
 
 # DIRETÓRIO DO EXECUTÁVEL #
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
 
 # KEYPOINTS DAS MAÕS # 
 POLEGAR_TOPO = 4
-INDICADOR_TOPO = 8
+MINDINHO_TOPO = 20
 
 # VARIÁVEIS DE CAPTURA DA CÂMERA E HANDMARKS #
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands() 
-cap = cv.VideoCapture(0)
+cap = cv.VideoCapture(1)
+
+cap = cv.VideoCapture("/dev/video0", cv.CAP_V4L2)
+# cap.set(cv.CAP_PROP_FRAME_WIDTH, 300)
+# cap.set(cv.CAP_PROP_FRAME_HEIGHT, 200)
+# cap.set(cv.CAP_PROP_FPS, 8)
 
 # VARIÁVEIS DE CONTROLE #
 modo_leitura = False
-leitura_tempo = 5
-ultimo_tempo = 0
 controle_leitura = False
+tempo = 0
 
-print(pytesseract.get_languages())
-
+# LOOP CENTRAL ( CAPTURA E TRATAMENTO DE FRAMES ) 
 while cap.isOpened():
     status, frame = cap.read()
 
@@ -37,15 +38,7 @@ while cap.isOpened():
     frame_to_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
     hand_results = hands.process(frame_to_rgb)
     
-    # LEITURA DE TEXTO
-    tempo_atual = cv.getTickCount()
-    if modo_leitura == True and (tempo_atual - ultimo_tempo) / cv.getTickFrequency() > leitura_tempo:
-        texto_detectado = pytesseract.image_to_string(frame_to_rgb, lang='por')
-        ultimo_tempo = tempo_atual
-
-        #if len(texto_detectado) > 0:
-        print(texto_detectado)
-
+    # DETECÇÃO DE MÃO
     if hand_results.multi_hand_landmarks:
         for landmarks in hand_results.multi_hand_landmarks:
             for _id, landmark in enumerate(landmarks.landmark):
@@ -55,12 +48,12 @@ while cap.isOpened():
                 polegar = landmarks.landmark[POLEGAR_TOPO]
                 polegar_x, polegar_y = int(polegar.x * w), int(polegar.y * h)
                 
-                # INDICADOR
-                indicador = landmarks.landmark[INDICADOR_TOPO]
-                indicador_x, indicador_y = int(indicador.x * w), int(indicador.y * h)
+                # MINDINHO
+                mindinho = landmarks.landmark[MINDINHO_TOPO]
+                mindinho_x, mindinho_y = int(mindinho.x * w), int(mindinho.y * h)
 
                 # Distância euclidiana -> d = √ ( X2 - X1 )^2 + ( Y2 - Y1 )^2
-                distancia = math.sqrt( ( polegar_x - indicador_x ) ** 2 + ( polegar_y - indicador_y) ** 2 ) 
+                distancia = math.sqrt( ( polegar_x - mindinho_x ) ** 2 + ( polegar_y - mindinho_y) ** 2 ) 
                 max_distance = 20
 
                 if distancia < max_distance and not controle_leitura:
@@ -68,16 +61,29 @@ while cap.isOpened():
                     modo_leitura = not modo_leitura
 
                     if modo_leitura:
-                        print('Modo leitura ativado.')
-                    else:
-                        print('Modo leitura desativado.')
+                        tempo = time()
+                        print('sinal de mao detectado')
+                        os.system(f'espeak -v pt-br ' + 'Captando imagem, aguarde e evite movimentar-se')
 
                 elif distancia > max_distance and controle_leitura:
                     controle_leitura = False
-
+                
                 cx, cy = int(landmark.x * w), int(landmark.y * h)
                 cv.circle(frame, (cx, cy), 5, (0, 255, 0), 1)
-                
+
+    # LEITURA DE TEXTO
+    # VERIFICAÇÃO DE TEMPO
+    if modo_leitura and ( time() - tempo ) >= 10:
+        print('passou 10s')
+        cv.imwrite('cap_frame.png', frame)
+        modo_leitura = False
+        text = pytesseract.image_to_string('cap_frame.png', lang='por')
+        if len(text):
+            os.system(f'espeak -v pt-br ' + 'Texto detectado.')
+            os.system(text)
+        else:
+            os.system(f'espeak -v pt-br ' + 'Nenhum texto detectado.')
+
     cv.imshow('TecVision', frame)
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
